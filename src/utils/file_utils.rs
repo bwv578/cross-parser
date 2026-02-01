@@ -7,7 +7,8 @@ pub struct DelimitedIter {
     out: (String, Option<char>),
     delimiters: HashSet<char>,
     chars_to_ignore: HashSet<char>,
-    reader: Option<BufReader<File>>
+    reader: Option<BufReader<File>>,
+    pub pos: (usize, usize)
 }
 
 impl DelimitedIter {
@@ -19,7 +20,8 @@ impl DelimitedIter {
                 out: (String::new(), None),
                 delimiters: HashSet::new(),
                 chars_to_ignore: HashSet::new(),
-                reader: Some(BufReader::new(file_to_read))
+                reader: Some(BufReader::new(file_to_read)),
+                pos: (1, 0)
             }
         )
     }
@@ -56,6 +58,14 @@ impl DelimitedIter {
                 }
                 Ok(_) => {
                     let c:char = buff[0] as char;
+
+                    if c=='\n' {
+                        self.pos.0 += 1;
+                        self.pos.1 = 0;
+                    }else {
+                        self.pos.1 += 1;
+                    }
+
                     if self.delimiters.contains(&c) {
                         self.out.1 = Some(c);
                         return Some(std::mem::take(&mut self.out));

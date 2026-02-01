@@ -52,8 +52,14 @@ pub fn execute(options:HashMap<String, String>) {
     }
 
     let mut formatter = get_formatter(source).expect("No formatter available.");
-    let result:StructuredData = (*formatter).parse(StructuredData::Unknown);
-    
+    let result = match (*formatter).parse(StructuredData::Unknown) {
+        Ok(data) => data,
+        Err(e) => {
+            eprintln!("Parsing error: {}", e);
+            std::process::exit(1);
+        }
+    };
+
     println!("structured :  {:#?}", result);
 }
 

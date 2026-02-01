@@ -1,5 +1,5 @@
-use std::collections::HashMap;
-use std::io::Error;
+use std::collections::{HashMap, HashSet};
+use std::error::Error;
 use crate::formats::format::Format;
 use crate::formats::json::json_format::Target::Value;
 use crate::models::structured_data::StructuredData;
@@ -9,8 +9,10 @@ use crate::utils::file_utils::DelimitedIter;
 static JSON_DELIMITERS: [char; 8] = ['{', '}', '[', ']', '"', '\'', ':', ','];
 static JSON_CHARS_TO_IGNORE: [char; 3] = ['\n', '\r', '\t'];
 
+#[derive(Debug)]
 pub struct JsonFormat{
-    iter: DelimitedIter,
+    pub iter: DelimitedIter,
+    pub expected: HashSet<char>,
 }
 
 enum Target{
@@ -23,20 +25,23 @@ impl JsonFormat {
         let mut json_iter = file.iter.expect("No iterator for the file.");
         json_iter.set_delimiters(&JSON_DELIMITERS);
         json_iter.set_chars_to_ignore(&JSON_CHARS_TO_IGNORE);
-        JsonFormat{iter: json_iter,}
+        JsonFormat{
+            iter: json_iter,
+            expected: HashSet::from(['{', '['])
+        }
     }
 }
 
 
 impl Format for JsonFormat {
 
-    fn parse(&mut self, mut scope:StructuredData) -> StructuredData {
+    fn parse(&mut self, mut scope:StructuredData) -> Result<StructuredData, Box<dyn Error>> {
         let mut buf:String = String::new();
         let mut target:Target = Target::Key;
+        
+        while let Some(next) = self.expect() {
 
-        while let Some(next) = self.iter.next() {
             match next.1 {
-
                 Some('{') => {
                     match &mut scope {
                         StructuredData::Unknown => {
@@ -48,7 +53,7 @@ impl Format for JsonFormat {
                                 Target::Value => {
                                     obj.insert(
                                         std::mem::take(&mut buf),
-                                        self.parse(StructuredData::Object(HashMap::new()))
+                                        self.parse( StructuredData::Object(HashMap::new()) )?
                                     );
                                 }
                             }
@@ -57,7 +62,7 @@ impl Format for JsonFormat {
                             arr.push(
                                 self.parse(
                                     StructuredData::Object(HashMap::new())
-                                )
+                                )?
                             );
                         },
                         StructuredData::String(str) => {
@@ -78,7 +83,7 @@ impl Format for JsonFormat {
                                     StructuredData::String(next.0.trim().to_string())
                                 );
                             }
-                            return scope;
+                            return Ok(scope);
                         },
                         StructuredData::Array(_arr) => { panic!("Invalid Format"); },
                         StructuredData::String(str) => {
@@ -97,12 +102,12 @@ impl Format for JsonFormat {
                         StructuredData::Object(obj) => {
                             obj.insert(
                                 std::mem::take(&mut buf),
-                                self.parse(StructuredData::Array(Vec::new()))
+                                self.parse(StructuredData::Array(Vec::new()))?
                             );
                         },
                         StructuredData::Array(arr) => {
                             arr.push(
-                                self.parse(StructuredData::Array(Vec::new()))
+                                self.parse(StructuredData::Array(Vec::new()))?
                             );
                         },
                         StructuredData::String(str) => {
@@ -117,12 +122,12 @@ impl Format for JsonFormat {
                     match &mut scope {
                         StructuredData::Unknown => { panic!("Invalid Format"); },
                         StructuredData::Object(_obj) => { panic!("Invalid Format"); },
-                        StructuredData::Array(_arr) => { return scope; },
+                        StructuredData::Array(_arr) => { return Ok(scope); },
                         StructuredData::String(str) => {
                             str.push_str(&next.0);
                             str.push('}');
                         },
-                        StructuredData::Number(num) => { panic!("Invalid Format"); }
+                        StructuredData::Number(_num) => { panic!("Invalid Format"); }
                     }
                 },
 
@@ -133,7 +138,7 @@ impl Format for JsonFormat {
                             match target {
                                 Target::Key => {
                                     buf = self
-                                        .parse(StructuredData::String(String::from(next.1.unwrap())))
+                                        .parse(StructuredData::String( String::from(next.1.unwrap())) )?
                                         .take_string()
                                         .expect("Invalid format.");
                                 },
@@ -142,14 +147,16 @@ impl Format for JsonFormat {
                                         std::mem::take(&mut buf),
                                         self.parse(
                                             StructuredData::String(String::from(next.1.unwrap()))
-                                        )
+                                        )?
                                     );
                                 }
                             }
                         },
                         StructuredData::Array(arr) => {
                             arr.push(
-                                self.parse(StructuredData::String(String::from(next.1.unwrap())))
+                                self.parse(
+                                    StructuredData::String( String::from(next.1.unwrap()) )
+                                )?
                             );
                         },
                         StructuredData::String(str) => {
@@ -158,7 +165,7 @@ impl Format for JsonFormat {
                                 Some(opener) => { str.push(opener); }
                                 _ => { panic!("어???"); }
                             }
-                            return scope;
+                            return Ok(scope);
                         },
                         StructuredData::Number(_num) => { panic!("Invalid Format"); },
                     }
@@ -179,7 +186,7 @@ impl Format for JsonFormat {
                             str.push_str(&next.0);
                             str.push(':');
                         },
-                        StructuredData::Number(num) => { panic!("Invalid Format"); }
+                        StructuredData::Number(_num) => { panic!("Invalid Format"); }
                     }
                 },
 
@@ -208,8 +215,8 @@ impl Format for JsonFormat {
                         },
                         StructuredData::Number(num) => {
                             // todo 이거 필요 없는거같은데
-                            *num = next.0.trim().parse().unwrap();
-                            return scope;
+                            *num = next.0.trim().parse()?;
+                            return Ok(scope);
                         }
                     }
                 },
@@ -218,10 +225,10 @@ impl Format for JsonFormat {
             }
         }
 
-        return scope
+        return Ok(scope);
     }
 
-    fn export(&mut self, structure: StructuredData) -> Result<String, Error> {
+    fn export(&mut self, structure: StructuredData) -> Result<String, Box<dyn Error>> {
         todo!()
     }
 
