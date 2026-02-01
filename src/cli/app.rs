@@ -44,8 +44,8 @@ pub fn execute(options:HashMap<String, String>) {
     match options.get(&String::from("to")) {
         Some(format) => {
             target
-                .append_name(&String::from("."))
-                .append_name(format)
+                .append_path(&String::from("."))
+                .append_path(format)
                 .set_format(format);
         }
         _ => {}

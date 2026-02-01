@@ -4,17 +4,17 @@ use crate::utils::file_utils::{DelimitedIter};
 
 #[derive(Debug)]
 pub struct TextFile {
-    pub name:String,
+    pub path:String,
     pub format:String,
     pub iter: Option<DelimitedIter>,
 }
 
 impl TextFile {
 
-    pub fn new(file_name:&String) -> Self {
+    pub fn new(file_path:&String) -> Self {
         let mut inferred_format:String = String::from("");
 
-        let vectorized:Vec<char> = file_name.chars().collect();
+        let vectorized:Vec<char> = file_path.chars().collect();
         let mut i:usize = vectorized.len();
 
         while i>0 {
@@ -26,14 +26,14 @@ impl TextFile {
         }
 
         return Self {
-            name: file_name.clone(),
+            path: file_path.clone(),
             format: mirror(&inferred_format),
             iter: None
         }
     }
 
-    pub fn set_name(self:&mut Self, new_name:&String) -> &mut Self {
-        self.name = new_name.to_string();
+    pub fn set_path(self:&mut Self, new_path:&String) -> &mut Self {
+        self.path = new_path.to_string();
         return self;
     }
 
@@ -42,27 +42,27 @@ impl TextFile {
         return self;
     }
 
-    pub fn append_name(self:&mut Self, suffix:&String) -> &mut Self {
-        self.name.push_str(suffix);
+    pub fn append_path(self:&mut Self, suffix:&String) -> &mut Self {
+        self.path.push_str(suffix);
         return self;
     }
 
     pub fn shell_copy(self:&mut Self) -> Self {
         return Self {
-            name: self.name.clone(),
+            path: self.path.clone(),
             format: self.format.clone(),
             iter: None
         }
     }
 
     pub fn impl_as_reader(self:&mut Self) -> &mut Self {
-        let iter_result:Result<DelimitedIter, Error> = DelimitedIter::new(&self.name);
+        let iter_result:Result<DelimitedIter, Error> = DelimitedIter::new(&self.path);
         match iter_result {
             Ok(mut iter) => {
                 iter.set_chars_to_ignore(&[' ', '\r', '\n', '\t']);
                 self.iter = Some(iter);
             }
-            Err(_) => {panic!("Invalid file path: {}", self.name)}
+            Err(_) => {panic!("Invalid file path: {}", self.path)}
         }
         return self;
     }

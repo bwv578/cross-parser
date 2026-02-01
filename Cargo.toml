@@ -1,4 +1,4 @@
 [package]
-name = "parser"
+name = "crossp"
 version = "0.0.1"
 edition = "2021"
