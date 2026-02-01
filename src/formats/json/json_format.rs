@@ -12,7 +12,7 @@ static JSON_CHARS_TO_IGNORE: [char; 3] = ['\n', '\r', '\t'];
 #[derive(Debug)]
 pub struct JsonFormat{
     pub iter: DelimitedIter,
-    pub expected: HashSet<char>,
+    pub expectation: HashSet<char>,
 }
 
 enum Target{
@@ -27,7 +27,7 @@ impl JsonFormat {
         json_iter.set_chars_to_ignore(&JSON_CHARS_TO_IGNORE);
         JsonFormat{
             iter: json_iter,
-            expected: HashSet::from(['{', '['])
+            expectation: HashSet::from(['{', '['])
         }
     }
 }
@@ -38,11 +38,12 @@ impl Format for JsonFormat {
     fn parse(&mut self, mut scope:StructuredData) -> Result<StructuredData, Box<dyn Error>> {
         let mut buf:String = String::new();
         let mut target:Target = Target::Key;
-        
-        while let Some(next) = self.expect() {
 
+        while let Some(next) = self.expect_next() {
             match next.1 {
+
                 Some('{') => {
+                    self.set_expectation(&[' ', '}', '"', '\'']);
                     match &mut scope {
                         StructuredData::Unknown => {
                             scope = StructuredData::Object(HashMap::new());
@@ -60,22 +61,21 @@ impl Format for JsonFormat {
                         },
                         StructuredData::Array(arr) => {
                             arr.push(
-                                self.parse(
-                                    StructuredData::Object(HashMap::new())
-                                )?
+                                self.parse( StructuredData::Object(HashMap::new()) )?
                             );
                         },
                         StructuredData::String(str) => {
                             str.push_str(&next.0);
                             str.push('{');
                         },
+
                         StructuredData::Number(_num) => { panic!("Invalid Format"); }
                     }
                 },
 
                 Some('}') => {
+                    self.set_expectation(&[' ', ',']);
                     match &mut scope {
-                        StructuredData::Unknown => { panic!("Invalid Format"); },
                         StructuredData::Object(obj) => {
                             if !next.0.trim().is_empty() {
                                 obj.insert(
@@ -90,11 +90,14 @@ impl Format for JsonFormat {
                             str.push_str(&next.0);
                             str.push('}');
                         },
+
+                        StructuredData::Unknown => { panic!("Invalid Format"); },
                         StructuredData::Number(_num) => { panic!("Invalid Format"); },
                     }
                 },
 
                 Some('[') => {
+                    self.expectation.clear();
                     match &mut scope {
                         StructuredData::Unknown => {
                             scope = StructuredData::Array(Vec::new());
@@ -114,27 +117,28 @@ impl Format for JsonFormat {
                             str.push_str(&next.0);
                             str.push(']');
                         },
+
                         StructuredData::Number(num) => { panic!("Invalid Format"); }
                     }
                 },
 
                 Some(']') => {
+                    self.set_expectation(&[' ', ',', ']', '}']);
                     match &mut scope {
-                        StructuredData::Unknown => { panic!("Invalid Format"); },
-                        StructuredData::Object(_obj) => { panic!("Invalid Format"); },
                         StructuredData::Array(_arr) => { return Ok(scope); },
                         StructuredData::String(str) => {
                             str.push_str(&next.0);
                             str.push('}');
                         },
-                        StructuredData::Number(_num) => { panic!("Invalid Format"); }
+
+                        _ => { panic!("Invalid Format - scope:OBJECT"); }
                     }
                 },
 
                 Some('\"') | Some('\'') => {
                     match &mut scope {
-                        StructuredData::Unknown => { panic!("Invalid Format"); },
                         StructuredData::Object(obj) => {
+                            self.expectation.clear();
                             match target {
                                 Target::Key => {
                                     buf = self
@@ -153,6 +157,7 @@ impl Format for JsonFormat {
                             }
                         },
                         StructuredData::Array(arr) => {
+                            self.expectation.clear();
                             arr.push(
                                 self.parse(
                                     StructuredData::String( String::from(next.1.unwrap()) )
@@ -160,6 +165,7 @@ impl Format for JsonFormat {
                             );
                         },
                         StructuredData::String(str) => {
+                            self.set_expectation(&[' ', ',', ':', '}', ']']);
                             str.push_str(&next.0);
                             match str.chars().next() {
                                 Some(opener) => { str.push(opener); }
@@ -167,13 +173,15 @@ impl Format for JsonFormat {
                             }
                             return Ok(scope);
                         },
+
+                        StructuredData::Unknown => { panic!("Invalid Format"); },
                         StructuredData::Number(_num) => { panic!("Invalid Format"); },
                     }
                 },
 
                 Some(':') => {
+                    self.expectation.clear();
                     match &mut scope {
-                        StructuredData::Unknown => { panic!("Invalid Format"); },
                         StructuredData::Object(_obj) => {
                             target = Value;
                             buf.push_str(&next.0.trim());
@@ -181,19 +189,21 @@ impl Format for JsonFormat {
                                 panic!("Invalid Format : Key is empty");
                             }
                         },
-                        StructuredData::Array(_arr) => { panic!("Invalid Format"); },
                         StructuredData::String(str) => {
                             str.push_str(&next.0);
                             str.push(':');
                         },
+
+                        StructuredData::Unknown => { panic!("Invalid Format"); },
+                        StructuredData::Array(_arr) => { panic!("Invalid Format"); },
                         StructuredData::Number(_num) => { panic!("Invalid Format"); }
                     }
                 },
 
                 Some(',') => {
                     match &mut scope {
-                        StructuredData::Unknown => { panic!("Invalid Format"); },
                         StructuredData::Object(obj) => {
+                            self.set_expectation(&[' ', '"', '\'']);
                             target = Target::Key;
                             if next.0.trim().is_empty() {
                                 buf.clear();
@@ -205,11 +215,13 @@ impl Format for JsonFormat {
                             }
                         },
                         StructuredData::Array(arr) => {
+                            self.expectation.clear();
                             if !next.0.trim().is_empty() {
                                 arr.push( StructuredData::String(next.0) )
                             }
                         },
                         StructuredData::String(str) => {
+                            self.expectation.clear();
                             str.push_str(&next.0);
                             str.push(',');
                         },
@@ -218,6 +230,8 @@ impl Format for JsonFormat {
                             *num = next.0.trim().parse()?;
                             return Ok(scope);
                         }
+
+                        StructuredData::Unknown => { panic!("Invalid Format"); },
                     }
                 },
 
