@@ -1,20 +1,21 @@
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use crate::formats::format::Format;
-use crate::formats::json::json_format::Target::Value;
+use crate::formats::json::json_error::CONTENT_STARTED;
+use crate::formats::json::json_format::Target::{Key, Value};
 use crate::models::structured_data::StructuredData;
 use crate::models::text_file::TextFile;
 use crate::utils::file_utils::DelimitedIter;
 
 static JSON_DELIMITERS: [char; 8] = ['{', '}', '[', ']', '"', '\'', ':', ','];
-static JSON_CHARS_TO_IGNORE: [char; 3] = ['\n', '\r', '\t'];
 
 #[derive(Debug)]
 pub struct JsonFormat{
     pub iter: DelimitedIter,
-    pub expectation: HashSet<char>,
+    pub expectation: &'static HashSet<char>,
 }
 
+#[derive(PartialEq)]
 enum Target{
     Key,
     Value
@@ -24,10 +25,11 @@ impl JsonFormat {
     pub fn new(file:TextFile) -> Self {
         let mut json_iter = file.iter.expect("No iterator for the file.");
         json_iter.set_delimiters(&JSON_DELIMITERS);
-        json_iter.set_chars_to_ignore(&JSON_CHARS_TO_IGNORE);
         JsonFormat{
             iter: json_iter,
-            expectation: HashSet::from(['{', '['])
+            expectation: CONTENT_STARTED.get_or_init(|| {
+                HashSet::from(['{', '['])
+            })
         }
     }
 }
@@ -43,26 +45,20 @@ impl Format for JsonFormat {
             match next.1 {
 
                 Some('{') => {
-                    self.set_expectation(&[' ', '}', '"', '\'']);
+                    self.set_expectations("OBJECT_OPENED");
                     match &mut scope {
                         StructuredData::Unknown => {
                             scope = StructuredData::Object(HashMap::new());
                         },
                         StructuredData::Object(obj) => {
-                            match target {
-                                Target::Key => { panic!("Invalid format : Key is required.") },
-                                Target::Value => {
-                                    obj.insert(
-                                        std::mem::take(&mut buf),
-                                        self.parse( StructuredData::Object(HashMap::new()) )?
-                                    );
-                                }
-                            }
-                        },
-                        StructuredData::Array(arr) => {
-                            arr.push(
+                            if target == Key { panic!("Invalid format : Key is required.") }
+                            obj.insert(
+                                std::mem::take(&mut buf),
                                 self.parse( StructuredData::Object(HashMap::new()) )?
                             );
+                        },
+                        StructuredData::Array(arr) => {
+                            arr.push( self.parse( StructuredData::Object(HashMap::new()) )? );
                         },
                         StructuredData::String(str) => {
                             str.push_str(&next.0);
@@ -74,7 +70,7 @@ impl Format for JsonFormat {
                 },
 
                 Some('}') => {
-                    self.set_expectation(&[' ', ',']);
+                    self.set_expectations("OBJECT_CLOSED");
                     match &mut scope {
                         StructuredData::Object(obj) => {
                             if !next.0.trim().is_empty() {
@@ -85,19 +81,17 @@ impl Format for JsonFormat {
                             }
                             return Ok(scope);
                         },
-                        StructuredData::Array(_arr) => { panic!("Invalid Format"); },
                         StructuredData::String(str) => {
                             str.push_str(&next.0);
                             str.push('}');
                         },
 
-                        StructuredData::Unknown => { panic!("Invalid Format"); },
-                        StructuredData::Number(_num) => { panic!("Invalid Format"); },
+                        _ => { panic!("Invalid Format"); }
                     }
                 },
 
                 Some('[') => {
-                    self.expectation.clear();
+                    self.set_expectations("ANY");
                     match &mut scope {
                         StructuredData::Unknown => {
                             scope = StructuredData::Array(Vec::new());
@@ -123,7 +117,7 @@ impl Format for JsonFormat {
                 },
 
                 Some(']') => {
-                    self.set_expectation(&[' ', ',', ']', '}']);
+                    self.set_expectations("ARRAY_CLOSED");
                     match &mut scope {
                         StructuredData::Array(_arr) => { return Ok(scope); },
                         StructuredData::String(str) => {
@@ -131,33 +125,29 @@ impl Format for JsonFormat {
                             str.push('}');
                         },
 
-                        _ => { panic!("Invalid Format - scope:OBJECT"); }
+                        _ => { panic!("Invalid Format - SCOPE:OBJECT"); }
                     }
                 },
 
                 Some('\"') | Some('\'') => {
                     match &mut scope {
                         StructuredData::Object(obj) => {
-                            self.expectation.clear();
-                            match target {
-                                Target::Key => {
-                                    buf = self
-                                        .parse(StructuredData::String( String::from(next.1.unwrap())) )?
-                                        .take_string()
-                                        .expect("Invalid format.");
-                                },
-                                Target::Value => {
-                                    obj.insert(
-                                        std::mem::take(&mut buf),
-                                        self.parse(
-                                            StructuredData::String(String::from(next.1.unwrap()))
-                                        )?
-                                    );
-                                }
+                            self.set_expectations("ANY");
+                            if target == Key {
+                                buf = self
+                                    .parse(StructuredData::String( String::from(next.1.unwrap())) )?
+                                    .take_string()
+                                    .expect("Invalid format.");
+                                self.set_expectations("KEY_READY");
+                            }else {
+                                obj.insert(
+                                    std::mem::take(&mut buf),
+                                    self.parse( StructuredData::String(String::from(next.1.unwrap())) )?
+                                );
                             }
                         },
                         StructuredData::Array(arr) => {
-                            self.expectation.clear();
+                            self.set_expectations("ANY");
                             arr.push(
                                 self.parse(
                                     StructuredData::String( String::from(next.1.unwrap()) )
@@ -165,7 +155,7 @@ impl Format for JsonFormat {
                             );
                         },
                         StructuredData::String(str) => {
-                            self.set_expectation(&[' ', ',', ':', '}', ']']);
+                            self.set_expectations("STRING_CLOSED");
                             str.push_str(&next.0);
                             match str.chars().next() {
                                 Some(opener) => { str.push(opener); }
@@ -174,36 +164,31 @@ impl Format for JsonFormat {
                             return Ok(scope);
                         },
 
-                        StructuredData::Unknown => { panic!("Invalid Format"); },
-                        StructuredData::Number(_num) => { panic!("Invalid Format"); },
+                        _ => { panic!("Invalid Format"); }
                     }
                 },
 
                 Some(':') => {
-                    self.expectation.clear();
+                    self.set_expectations("ANY");
                     match &mut scope {
                         StructuredData::Object(_obj) => {
                             target = Value;
                             buf.push_str(&next.0.trim());
-                            if buf.is_empty() {
-                                panic!("Invalid Format : Key is empty");
-                            }
+                            if buf.is_empty() { panic!("Invalid Format : Key is empty"); }
                         },
                         StructuredData::String(str) => {
                             str.push_str(&next.0);
                             str.push(':');
                         },
 
-                        StructuredData::Unknown => { panic!("Invalid Format"); },
-                        StructuredData::Array(_arr) => { panic!("Invalid Format"); },
-                        StructuredData::Number(_num) => { panic!("Invalid Format"); }
+                        _ => { panic!("Invalid Format"); }
                     }
                 },
 
                 Some(',') => {
                     match &mut scope {
                         StructuredData::Object(obj) => {
-                            self.set_expectation(&[' ', '"', '\'']);
+                            self.set_expectations("KEY_VALUE_PAIRED");
                             target = Target::Key;
                             if next.0.trim().is_empty() {
                                 buf.clear();
@@ -215,13 +200,13 @@ impl Format for JsonFormat {
                             }
                         },
                         StructuredData::Array(arr) => {
-                            self.expectation.clear();
+                            self.set_expectations("ANY");
                             if !next.0.trim().is_empty() {
                                 arr.push( StructuredData::String(next.0) )
                             }
                         },
                         StructuredData::String(str) => {
-                            self.expectation.clear();
+                            self.set_expectations("ANY");
                             str.push_str(&next.0);
                             str.push(',');
                         },
