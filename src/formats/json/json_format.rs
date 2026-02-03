@@ -220,6 +220,7 @@ impl Format for JsonFormat {
                     }
                 },
 
+                None => {/* Keep Iterating */},
                 _ => {panic!("세상에 이런일이");}
             }
         }

@@ -52,10 +52,13 @@ impl JsonFormat {
 
         match self.iter.next() {
             Some(next) => {
-                let v:char = next.0
-                    .chars()
-                    .next()
-                    .unwrap_or( next.1.unwrap() );
+                let v:char;
+                if next.0.chars().next() == None {
+                    if next.1 == None {return self.expect_next();}
+                    v = next.1.unwrap();
+                }else {
+                    v = next.0.chars().next().unwrap();
+                }
 
                 if self.expectation.is_empty() || self.expectation.contains(&v) {
                     return Some(next);
