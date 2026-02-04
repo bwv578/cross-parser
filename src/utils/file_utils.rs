@@ -61,7 +61,7 @@ impl DelimitedIter {
 
                     if c=='\n' {
                         self.pos.0 += 1;
-                        self.pos.1 = 1;
+                        self.pos.1 = 0;
                     }else {
                         self.pos.1 += 1;
                     }

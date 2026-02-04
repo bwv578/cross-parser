@@ -60,20 +60,21 @@ impl JsonFormat {
                     v = next.0.chars().next().unwrap();
                 }
 
+                let lines_jumped = next.0.
+                    chars().filter(|&c| c == '\n').count();
+
+                let line:usize =  self.iter.pos.0-lines_jumped;
+                let mut col = self.iter.pos.1 - next.0.chars()
+                    .rev()
+                    .take_while(|&c| c != '\n')
+                    .count();
+
+                if col==0 {col+=1;}
+
                 if self.expectation.is_empty() || self.expectation.contains(&v) {
                     return Some(next);
                 }else {
-                    let lines_jumped = next.0.
-                        chars().filter(|&c| c == '\n').count();
-
-                    if next.0.len()>0 {
-                        println!("Error: Invalid JSON format - line:{}, col:{}",
-                                 self.iter.pos.0-lines_jumped, self.iter.pos.1+lines_jumped-next.0.len());
-                    }else {
-                        println!("Error: Invalid JSON format - line:{}, col:{}",
-                                 self.iter.pos.0-lines_jumped, self.iter.pos.1);
-                    }
-
+                    println!("Error: Invalid JSON format: line:{}, col:{}", line, col);
                     print!("Hint: Expected ");
                     for x in self.expectation {
                         if !ignores.contains(x){ print!("{} ", x); }
@@ -85,17 +86,27 @@ impl JsonFormat {
 
             None => {
                 if self.expectation.is_empty() { return None; }
-                println!("Error: Invalid JSON format - line:{}, col:{}",
+                println!("Error: Invalid JSON format: line:{}, col:{}",
                          self.iter.pos.0, self.iter.pos.1);
-
                 print!("Hint: Expected ");
                 for x in self.expectation {
                     if !ignores.contains(x){ print!("{} ", x); }
                 }
-
                 println!("but found nothing.");
                 std::process::exit(1);
             }
         }
     }
+
+    pub fn shutdown_with_error(&mut self, message: &str, hint: &str) {
+        let col = if self.iter.pos.1 == 0 {
+            self.iter.pos.0 + 1
+        }else {
+            self.iter.pos.1
+        };
+        println!("Error: {} : line:{}, col:{}", message, self.iter.pos.0, col);
+        println!("Hint: {}", hint);
+        std::process::exit(1);
+    }
+
 }

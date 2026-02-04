@@ -1,3 +1,4 @@
+use std::string::String;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use crate::formats::format::Format;
@@ -28,7 +29,7 @@ impl JsonFormat {
         JsonFormat{
             iter: json_iter,
             expectation: CONTENT_STARTED.get_or_init(|| {
-                HashSet::from(['{', '['])
+                HashSet::from([' ', '\n', '\r', '\t', '{', '['])
             })
         }
     }
@@ -48,10 +49,16 @@ impl Format for JsonFormat {
                     self.set_expectations("OBJECT_OPENED");
                     match &mut scope {
                         StructuredData::Unknown => {
+                            if !next.0.trim().is_empty() {
+                                let hint = String::from("Found ") + &String::from(next.0);
+                                self.shutdown_with_error("Invalid format", &hint);
+                            }
                             scope = StructuredData::Object(HashMap::new());
                         },
                         StructuredData::Object(obj) => {
-                            if target == Key { panic!("Invalid format : Key is required.") }
+                            if target == Key {
+                                self.shutdown_with_error("Invalid format", "Key is required.");
+                            }
                             obj.insert(
                                 std::mem::take(&mut buf),
                                 self.parse( StructuredData::Object(HashMap::new()) )?
@@ -65,7 +72,10 @@ impl Format for JsonFormat {
                             str.push('{');
                         },
 
-                        StructuredData::Number(_num) => { panic!("Invalid Format"); }
+                        StructuredData::Number(_num) => {
+                            panic!("Invalid Format");
+                            todo!("shutdown with error")
+                        }
                     }
                 },
 
@@ -86,7 +96,7 @@ impl Format for JsonFormat {
                             str.push('}');
                         },
 
-                        _ => { panic!("Invalid Format"); }
+                        _ => { panic!("Invalid Format"); todo!("shutdown with error") }
                     }
                 },
 
@@ -112,7 +122,7 @@ impl Format for JsonFormat {
                             str.push(']');
                         },
 
-                        StructuredData::Number(num) => { panic!("Invalid Format"); }
+                        StructuredData::Number(num) => { panic!("Invalid Format"); todo!("shutdown with error")}
                     }
                 },
 
@@ -125,7 +135,7 @@ impl Format for JsonFormat {
                             str.push('}');
                         },
 
-                        _ => { panic!("Invalid Format - SCOPE:OBJECT"); }
+                        _ => {self.shutdown_with_error("Invalid format", "Found ].");}
                     }
                 },
 
@@ -137,7 +147,7 @@ impl Format for JsonFormat {
                                 buf = self
                                     .parse(StructuredData::String( String::from(next.1.unwrap())) )?
                                     .take_string()
-                                    .expect("Invalid format.");
+                                    .expect("Invalid format."); //todo!("shutdown with error")
                                 self.set_expectations("KEY_READY");
                             }else {
                                 obj.insert(
@@ -164,7 +174,7 @@ impl Format for JsonFormat {
                             return Ok(scope);
                         },
 
-                        _ => { panic!("Invalid Format"); }
+                        _ => { panic!("Invalid Format"); todo!("shutdown with error") }
                     }
                 },
 
@@ -174,14 +184,16 @@ impl Format for JsonFormat {
                         StructuredData::Object(_obj) => {
                             target = Value;
                             buf.push_str(&next.0.trim());
-                            if buf.is_empty() { panic!("Invalid Format : Key is empty"); }
+                            if buf.is_empty() {
+                                self.shutdown_with_error("Invalid format", "Key is required.");
+                            }
                         },
                         StructuredData::String(str) => {
                             str.push_str(&next.0);
                             str.push(':');
                         },
 
-                        _ => { panic!("Invalid Format"); }
+                        _ => { panic!("Invalid Format"); todo!("shutdown with error")}
                     }
                 },
 
@@ -216,12 +228,12 @@ impl Format for JsonFormat {
                             return Ok(scope);
                         }
 
-                        StructuredData::Unknown => { panic!("Invalid Format"); },
+                        StructuredData::Unknown => { panic!("Invalid Format"); todo!("shutdown with error")},
                     }
                 },
 
                 None => {/* Keep Iterating */},
-                _ => {panic!("세상에 이런일이");}
+                _ => {panic!("세상에 이런일이"); todo!("shutdown with error")}
             }
         }
 
@@ -238,9 +250,7 @@ impl StructuredData {
 
     fn take_string(&mut self) -> Option<String> {
         match self {
-            StructuredData::String(str) => {
-                return Some(std::mem::take(str));
-            }
+            StructuredData::String(str) => Some(std::mem::take(str)),
             _ => None
         }
     }
