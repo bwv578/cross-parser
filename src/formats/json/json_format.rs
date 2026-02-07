@@ -48,7 +48,7 @@ impl JsonFormat {
         }
     }
 
-    pub fn write_data(&mut self, writer:&mut BufWriter<File>, data:StructuredData, depth:i32) -> Result<String, Box<dyn Error>> {
+    pub fn write_data(&mut self, writer:&mut BufWriter<File>, data:StructuredData, depth:i32, idx:usize) -> Result<String, Box<dyn Error>> {
         match data {
             StructuredData::Unknown => {
                 return Err(Box::new(std::fmt::Error))
@@ -59,12 +59,14 @@ impl JsonFormat {
 
                 write!(writer, "{{\n")?;
                 for (i, (key, value)) in obj.into_iter().enumerate() {
+                    Self::indent(writer, depth+1)?;
                     write!(writer, "\"{}\" : ", key)?;
-                    self.write_data(writer, value, depth+1)?;
+
+                    self.write_data(writer, value, depth+1, i)?;
                     if i!=len-1 { write!(writer, ",\n")?; }
                     else { write!(writer, "\n")?; }
                 }
-                write!(writer, "}}")?;
+                Self::indent(writer, depth)?; write!(writer, "}}")?;
             },
 
             StructuredData::Array(arr) => {
@@ -72,20 +74,20 @@ impl JsonFormat {
 
                 writeln!(writer, "[\n")?;
                 for (i, elem) in arr.into_iter().enumerate() {
-                    self.write_data(writer, elem, depth+1)?;
+                    Self::indent(writer, depth+1)?;
+
+                    self.write_data(writer, elem, depth+1, i)?;
                     if i!=len-1 { write!(writer, ",\n")?; }
                     else { write!(writer, "\n")?; }
                 }
-                writeln!(writer, "]\n")?;
+                Self::indent(writer, depth)?; write!(writer, "]")?;
             },
 
             StructuredData::String(str) => {
-                Self::indent(writer, depth)?;
                 write!(writer, "\"{}\"", str)?;
             },
 
             StructuredData::Number(num) => {
-                Self::indent(writer, depth)?;
                 write!(writer, "{}", num)?;
             }
         }
@@ -314,7 +316,7 @@ impl Format for JsonFormat {
 
         let mut writer = BufWriter::new(file);
 
-        return self.write_data(&mut writer, data, 0);
+        return self.write_data(&mut writer, data, 0, 0);
     }
 
 }
