@@ -7,6 +7,7 @@ pub enum StructuredData {
     Array(Vec<StructuredData>),
     String(String),
     Number(String),
+    Boolean(String),
     Unknown
 }
 
@@ -17,4 +18,5 @@ impl StructuredData {
             _ => None
         }
     }
+
 }
