@@ -4,6 +4,7 @@ use crate::formats::format::Format;
 use crate::formats::json::json_format::JsonFormat;
 use crate::models::structured_data::StructuredData;
 
+
 pub fn parse_options(args:&Vec<String>) -> HashMap<String, String>{
     let mut options:HashMap<String, String> = HashMap::new();
     let mut k:String = String::new();
@@ -51,16 +52,27 @@ pub fn execute(options:HashMap<String, String>) {
         _ => {}
     }
 
+    println!("source format: {}", source.format);
     let mut formatter = get_formatter(source).expect("No formatter available.");
-    let result = match (*formatter).parse(StructuredData::Unknown) {
+    let format_result = match (*formatter).parse(StructuredData::Unknown) {
         Ok(data) => data,
         Err(e) => {
             eprintln!("Parsing error: {}", e);
             std::process::exit(1);
         }
     };
+    println!("structured :  {:#?}", format_result);
 
-    println!("structured :  {:#?}", result);
+    println!("exporter format: {}", target.format);
+    let mut exporter = get_formatter(target).expect("No exporter available.");
+    let export_result = match (*exporter).export(format_result) {
+        Ok(data) => data,
+        Err(e) => {
+            eprintln!("File write error: {}", e);
+            std::process::exit(1);
+        }
+    };
+    println!("export process : {:#?}", export_result);
 }
 
 

@@ -32,7 +32,7 @@ impl JsonFormat {
             "STRING_CLOSED" => STRING_CLOSED.get_or_init(|| {
                 HashSet::from([' ', '\n', '\r', '\t', ',', ':', '}', ']'])
             }),
-            "KEY_READY" => KEY_VALUE_PAIRED.get_or_init(|| {
+            "KEY_READY" => KEY_READY.get_or_init(|| {
                 HashSet::from([' ', '\n', '\r', '\t', ':'])
             }),
             "KEY_VALUE_PAIRED" => KEY_VALUE_PAIRED.get_or_init(|| {
@@ -46,11 +46,13 @@ impl JsonFormat {
     }
 
     pub fn expect_next(&mut self) -> Option<(String, Option<char>)> {
+        let iter = self.iter.as_mut().unwrap();
+
         let ignores: &HashSet<char> = JSON_CHARS_TO_IGNORE.get_or_init(|| {
             HashSet::from(['\n', '\r', '\t', ' '])
         });
 
-        match self.iter.next() {
+        match iter.next() {
             Some(next) => {
                 let v:char;
                 if next.0.chars().next() == None {
@@ -63,8 +65,8 @@ impl JsonFormat {
                 let lines_jumped = next.0.
                     chars().filter(|&c| c == '\n').count();
 
-                let line:usize =  self.iter.pos.0-lines_jumped;
-                let mut col = self.iter.pos.1 - next.0.chars()
+                let line:usize =  iter.pos.0-lines_jumped;
+                let mut col = iter.pos.1 - next.0.chars()
                     .rev()
                     .take_while(|&c| c != '\n')
                     .count();
@@ -87,7 +89,7 @@ impl JsonFormat {
             None => {
                 if self.expectation.is_empty() { return None; }
                 println!("Error: Invalid JSON format: line:{}, col:{}",
-                         self.iter.pos.0, self.iter.pos.1);
+                         iter.pos.0, iter.pos.1);
                 print!("Hint: Expected ");
                 for x in self.expectation {
                     if !ignores.contains(x){ print!("{} ", x); }
@@ -99,12 +101,14 @@ impl JsonFormat {
     }
 
     pub fn shutdown_with_error(&mut self, message: &str, hint: &str) {
-        let col = if self.iter.pos.1 == 0 {
-            self.iter.pos.0 + 1
+        let iter = self.iter.as_ref().unwrap();
+
+        let col = if iter.pos.1 == 0 {
+            iter.pos.0 + 1
         }else {
-            self.iter.pos.1
+            iter.pos.1
         };
-        println!("Error: {} : line:{}, col:{}", message, self.iter.pos.0, col);
+        println!("Error: {} : line:{}, col:{}", message, iter.pos.0, col);
         println!("Hint: {}", hint);
         std::process::exit(1);
     }

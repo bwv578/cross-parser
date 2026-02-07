@@ -6,6 +6,15 @@ pub enum StructuredData {
     Object(HashMap<String, StructuredData>),
     Array(Vec<StructuredData>),
     String(String),
-    Number(f64),
+    Number(String),
     Unknown
+}
+
+impl StructuredData {
+    pub fn take_string(&mut self) -> Option<String> {
+        match self {
+            StructuredData::String(str) => Some(std::mem::take(str)),
+            _ => None
+        }
+    }
 }

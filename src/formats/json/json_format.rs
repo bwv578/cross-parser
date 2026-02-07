@@ -1,19 +1,24 @@
 use std::string::String;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
+use std::fs::{create_dir_all, File, OpenOptions};
+use std::io::BufWriter;
+use std::io::Write;
+use std::path::Path;
 use crate::formats::format::Format;
 use crate::formats::json::json_error::CONTENT_STARTED;
 use crate::formats::json::json_format::Target::{Key, Value};
 use crate::models::structured_data::StructuredData;
 use crate::models::text_file::TextFile;
-use crate::utils::file_utils::DelimitedIter;
+use crate::utils::file_utils::delimited_iter::DelimitedIter;
 
 static JSON_DELIMITERS: [char; 8] = ['{', '}', '[', ']', '"', '\'', ':', ','];
 
 #[derive(Debug)]
 pub struct JsonFormat{
-    pub iter: DelimitedIter,
+    pub iter: Option<DelimitedIter>,
     pub expectation: &'static HashSet<char>,
+    path: String
 }
 
 #[derive(PartialEq)]
@@ -24,14 +29,73 @@ enum Target{
 
 impl JsonFormat {
     pub fn new(file:TextFile) -> Self {
-        let mut json_iter = file.iter.expect("No iterator for the file.");
-        json_iter.set_delimiters(&JSON_DELIMITERS);
+        let mut json_iter:Option<DelimitedIter> = file.iter;
+        let file_path:String = file.path;
+
+        match &mut json_iter {
+            Some(iter) => {
+                iter.set_delimiters(&JSON_DELIMITERS);
+            }
+            None => {}
+        }
+
         JsonFormat{
             iter: json_iter,
             expectation: CONTENT_STARTED.get_or_init(|| {
                 HashSet::from([' ', '\n', '\r', '\t', '{', '['])
-            })
+            }),
+            path: file_path
         }
+    }
+
+    pub fn write_data(&mut self, writer:&mut BufWriter<File>, data:StructuredData, depth:i32) -> Result<String, Box<dyn Error>> {
+        match data {
+            StructuredData::Unknown => {
+                return Err(Box::new(std::fmt::Error))
+            },
+
+            StructuredData::Object(obj) => {
+                let len = obj.len();
+
+                write!(writer, "{{\n")?;
+                for (i, (key, value)) in obj.into_iter().enumerate() {
+                    write!(writer, "\"{}\" : ", key)?;
+                    self.write_data(writer, value, depth+1)?;
+                    if i!=len-1 { write!(writer, ",\n")?; }
+                    else { write!(writer, "\n")?; }
+                }
+                write!(writer, "}}")?;
+            },
+
+            StructuredData::Array(arr) => {
+                let len = arr.len();
+
+                writeln!(writer, "[\n")?;
+                for (i, elem) in arr.into_iter().enumerate() {
+                    self.write_data(writer, elem, depth+1)?;
+                    if i!=len-1 { write!(writer, ",\n")?; }
+                    else { write!(writer, "\n")?; }
+                }
+                writeln!(writer, "]\n")?;
+            },
+
+            StructuredData::String(str) => {
+                Self::indent(writer, depth)?;
+                write!(writer, "\"{}\"", str)?;
+            },
+
+            StructuredData::Number(num) => {
+                Self::indent(writer, depth)?;
+                write!(writer, "{}", num)?;
+            }
+        }
+
+        return Ok(String::from("DONE"));
+    }
+
+    pub fn indent(writer:&mut BufWriter<File>, depth:i32) -> Result<bool, Box<dyn Error>> {
+        for _ in 0..depth { write!(writer, "\t")?; }
+        return Ok(true);
     }
 }
 
@@ -145,14 +209,14 @@ impl Format for JsonFormat {
                             self.set_expectations("ANY");
                             if target == Key {
                                 buf = self
-                                    .parse(StructuredData::String( String::from(next.1.unwrap())) )?
+                                    .parse(StructuredData::String( String::new()) )?
                                     .take_string()
                                     .expect("Invalid format."); //todo!("shutdown with error")
                                 self.set_expectations("KEY_READY");
                             }else {
                                 obj.insert(
                                     std::mem::take(&mut buf),
-                                    self.parse( StructuredData::String(String::from(next.1.unwrap())) )?
+                                    self.parse( StructuredData::String(String::new()) )?
                                 );
                             }
                         },
@@ -160,17 +224,13 @@ impl Format for JsonFormat {
                             self.set_expectations("ANY");
                             arr.push(
                                 self.parse(
-                                    StructuredData::String( String::from(next.1.unwrap()) )
+                                    StructuredData::String( String::new() )
                                 )?
                             );
                         },
                         StructuredData::String(str) => {
                             self.set_expectations("STRING_CLOSED");
                             str.push_str(&next.0);
-                            match str.chars().next() {
-                                Some(opener) => { str.push(opener); }
-                                _ => { panic!("어???"); }
-                            }
                             return Ok(scope);
                         },
 
@@ -240,19 +300,21 @@ impl Format for JsonFormat {
         return Ok(scope);
     }
 
-    fn export(&mut self, structure: StructuredData) -> Result<String, Box<dyn Error>> {
-        todo!()
-    }
+    fn export(&mut self, data: StructuredData) -> Result<String, Box<dyn Error>> {
+        let path:&Path = Path::new(&self.path);
 
-}
-
-impl StructuredData {
-
-    fn take_string(&mut self) -> Option<String> {
-        match self {
-            StructuredData::String(str) => Some(std::mem::take(str)),
-            _ => None
+        if let Some(parent) = path.parent() {
+            create_dir_all(parent).expect("Failed to create directories");
         }
+        let file:File = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.path)
+            .expect(&"Could not open JSON file.");
+
+        let mut writer = BufWriter::new(file);
+
+        return self.write_data(&mut writer, data, 0);
     }
 
 }

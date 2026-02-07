@@ -1,6 +1,6 @@
 use std::io::Error;
 use crate::utils::string_utils::mirror;
-use crate::utils::file_utils::{DelimitedIter};
+use crate::utils::file_utils::delimited_iter::{DelimitedIter};
 
 #[derive(Debug)]
 pub struct TextFile {
