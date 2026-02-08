@@ -1,7 +1,6 @@
 use std::collections::HashSet;
 use std::sync::OnceLock;
-use crate::formats::json::json_format::JsonFormat;
-
+use crate::formats::json::json::Json;
 
 pub static CONTENT_STARTED:OnceLock<HashSet<char>> = OnceLock::new();
 static OBJECT_OPENED:OnceLock<HashSet<char>> = OnceLock::new();
@@ -13,7 +12,7 @@ static KEY_VALUE_PAIRED: OnceLock<HashSet<char>> = OnceLock::new();
 static ANY: OnceLock<HashSet<char>> = OnceLock::new();
 static JSON_CHARS_TO_IGNORE: OnceLock<HashSet<char>> = OnceLock::new();
 
-impl JsonFormat {
+impl Json {
 
     pub fn set_expectations(&mut self, situation:&str) {
         self.expectation = match situation {
@@ -24,10 +23,10 @@ impl JsonFormat {
                 HashSet::from([' ', '\n', '\r', '\t', '}', '"', '\''])
             }),
             "OBJECT_CLOSED" => OBJECT_CLOSED.get_or_init(|| {
-                HashSet::from([' ', '\n', '\r', '\t', ',', ']'])
+                HashSet::from([' ', '\n', '\r', '\t', ',', '}', ']'])
             }),
             "ARRAY_CLOSED" => ARRAY_CLOSED.get_or_init(|| {
-                HashSet::from([' ', '\n', '\r', '\t', ',', ':', '}', ']'])
+                HashSet::from([' ', '\n', '\r', '\t', ',', '}', ']'])
             }),
             "STRING_CLOSED" => STRING_CLOSED.get_or_init(|| {
                 HashSet::from([' ', '\n', '\r', '\t', ',', ':', '}', ']'])

@@ -5,50 +5,11 @@ use std::fs::{create_dir_all, File, OpenOptions};
 use std::io::BufWriter;
 use std::path::Path;
 use crate::formats::format::Format;
-use crate::formats::json::json_error::CONTENT_STARTED;
-use crate::formats::json::json_format::Target::{Key, Value};
+use crate::formats::json::json::{Json, Target};
+use crate::formats::json::json::Target::{Key, Value};
 use crate::models::structured_data::StructuredData;
-use crate::models::text_file::TextFile;
-use crate::utils::file_utils::delimited_iter::DelimitedIter;
 
-static JSON_DELIMITERS: [char; 8] = ['{', '}', '[', ']', '"', '\'', ':', ','];
-
-#[derive(Debug)]
-pub struct JsonFormat{
-    pub iter: Option<DelimitedIter>,
-    pub expectation: &'static HashSet<char>,
-    path: String
-}
-
-#[derive(PartialEq)]
-enum Target{
-    Key,
-    Value
-}
-
-impl JsonFormat {
-    pub fn new(file:TextFile) -> Self {
-        let mut json_iter:Option<DelimitedIter> = file.iter;
-        let file_path:String = file.path;
-
-        match &mut json_iter {
-            Some(iter) => { iter.set_delimiters(&JSON_DELIMITERS); }
-            None => {}
-        }
-
-        JsonFormat{
-            iter: json_iter,
-            expectation: CONTENT_STARTED.get_or_init(|| {
-                HashSet::from([' ', '\n', '\r', '\t', '{', '['])
-            }),
-            path: file_path
-        }
-    }
-    
-}
-
-
-impl Format for JsonFormat {
+impl Format for Json {
 
     fn parse(&mut self, mut scope:StructuredData) -> Result<StructuredData, Box<dyn Error>> {
         let mut buf:String = String::new();

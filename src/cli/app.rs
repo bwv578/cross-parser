@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use crate::models::text_file::TextFile;
 use crate::formats::format::Format;
-use crate::formats::json::json_format::JsonFormat;
+use crate::formats::json::json::Json;
 use crate::models::structured_data::StructuredData;
 
 
@@ -79,7 +79,7 @@ pub fn execute(options:HashMap<String, String>) {
 
 pub fn get_formatter(file:TextFile) -> Option<Box<dyn Format>> {
     match file.format.as_str() {
-        "json" => Some(Box::new(JsonFormat::new(file))),
+        "json" => Some(Box::new(Json::new(file))),
         _ => None,
     }
 }

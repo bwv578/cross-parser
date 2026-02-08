@@ -3,10 +3,10 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::io::Write;
 use crate::utils::string_utils::classify_value;
-use crate::formats::json::json_format::JsonFormat;
+use crate::formats::json::json::Json;
 use crate::models::structured_data::StructuredData;
 
-impl JsonFormat {
+impl Json {
 
     pub fn write_data(&mut self, writer:&mut BufWriter<File>, data:StructuredData, depth:usize) -> Result<String, Box<dyn Error>> {
         match data {
