@@ -6,6 +6,9 @@ pub mod json{
     pub mod json_utils;
 }
 pub mod xml{
+    pub mod xml;
     pub mod xml_format;
+    pub mod xml_error;
+    pub mod xml_utils;
 }
 

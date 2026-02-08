@@ -1,38 +1,133 @@
-use std::collections::HashSet;
-use std::io::Error;
 use crate::formats::format::Format;
+use crate::formats::xml::xml::*;
 use crate::models::structured_data::StructuredData;
-use crate::models::text_file::TextFile;
-use crate::utils::file_utils::delimited_iter::DelimitedIter;
 
-#[derive(Debug)]
-pub struct XmlFormat{
-    pub iter: Option<DelimitedIter>,
-    pub expectation: &'static HashSet<char>,
-    path: String
-}
-
-impl Format for XmlFormat {
-    fn parse(&mut self, scope: StructuredData) -> Result<StructuredData, Box<dyn std::error::Error>> {
+impl Format for Xml {
+    fn parse(&mut self, mut scope: StructuredData) -> Result<StructuredData, Box<dyn std::error::Error>> {
 
         let mut buf:String = String::new();
-        //let mut target: crate::formats::json::json_format::Target = crate::formats::json::json_format::Target::Key;
+        let mut target:Target = Target::TagName;
 
-        /*while let Some(next) = self.expect_next() {
+        while let Some(next) = self.expect_next() {
             match next.1 {
 
+                Some('<') => {
+                    match &mut scope {
+                        StructuredData::Unknown => {
+                            target = Target::TagName;
+                            buf.clear();
+                        },
+                        StructuredData::Object(obj) => {},
+                        StructuredData::Array(arr) => {},
+                        StructuredData::String(str) => {},
+                        StructuredData::Number(num) => {},
+                        StructuredData::Boolean(boo) => {}
+                    }
+                },
 
+                Some('>') => {
+                    match &mut scope {
+                        StructuredData::Unknown => {},
+                        StructuredData::Object(obj) => {},
+                        StructuredData::Array(arr) => {},
+                        StructuredData::String(str) => {},
+                        StructuredData::Number(num) => {},
+                        StructuredData::Boolean(boo) => {}
+                    }
+                },
+
+                Some('/') => {
+                    match &mut scope {
+                        StructuredData::Unknown => {},
+                        StructuredData::Object(obj) => {},
+                        StructuredData::Array(arr) => {},
+                        StructuredData::String(str) => {},
+                        StructuredData::Number(num) => {},
+                        StructuredData::Boolean(boo) => {}
+                    }
+                },
+
+                Some('?') => {
+                    match &mut scope {
+                        StructuredData::Unknown => {},
+                        StructuredData::Object(obj) => {},
+                        StructuredData::Array(arr) => {},
+                        StructuredData::String(str) => {},
+                        StructuredData::Number(num) => {},
+                        StructuredData::Boolean(boo) => {}
+                    }
+                },
+
+                Some('"') => {
+                    match &mut scope {
+                        StructuredData::Unknown => {},
+                        StructuredData::Object(obj) => {},
+                        StructuredData::Array(arr) => {},
+                        StructuredData::String(str) => {},
+                        StructuredData::Number(num) => {},
+                        StructuredData::Boolean(boo) => {}
+                    }
+                },
+
+                Some('\'') => {
+                    match &mut scope {
+                        StructuredData::Unknown => {},
+                        StructuredData::Object(obj) => {},
+                        StructuredData::Array(arr) => {},
+                        StructuredData::String(str) => {},
+                        StructuredData::Number(num) => {},
+                        StructuredData::Boolean(boo) => {}
+                    }
+                },
+
+                Some('=') => {
+                    match &mut scope {
+                        StructuredData::Unknown => {},
+                        StructuredData::Object(obj) => {},
+                        StructuredData::Array(arr) => {},
+                        StructuredData::String(str) => {},
+                        StructuredData::Number(num) => {},
+                        StructuredData::Boolean(boo) => {}
+                    }
+                },
+
+                Some('!') => {
+                    match &mut scope {
+                        StructuredData::Unknown => {},
+                        StructuredData::Object(obj) => {},
+                        StructuredData::Array(arr) => {},
+                        StructuredData::String(str) => {},
+                        StructuredData::Number(num) => {},
+                        StructuredData::Boolean(boo) => {}
+                    }
+                },
+
+                Some('-') => {
+                    match &mut scope {
+                        StructuredData::Unknown => {},
+                        StructuredData::Object(obj) => {},
+                        StructuredData::Array(arr) => {},
+                        StructuredData::String(str) => {},
+                        StructuredData::Number(num) => {},
+                        StructuredData::Boolean(boo) => {}
+                    }
+                },
+
+                Some(' ') => {
+                    match &mut scope {
+                        StructuredData::Unknown => {},
+                        StructuredData::Object(obj) => {},
+                        StructuredData::Array(arr) => {},
+                        StructuredData::String(str) => {},
+                        StructuredData::Number(num) => {},
+                        StructuredData::Boolean(boo) => {}
+                    }
+                },
+
+                None => {},
+                _ => {}
             }
-        }*/
-
-        /*match scope {
-            StructuredData::Unknown => {},
-            StructuredData::Object(obj) => {},
-            StructuredData::Array(arr) => {},
-            StructuredData::String(str) => {},
-            StructuredData::Number(num) => {},
-            StructuredData::Boolean(bool) => {},
-        }*/
+        }
 
         return Ok(scope);
     }

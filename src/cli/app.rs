@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use crate::models::text_file::TextFile;
 use crate::formats::format::Format;
 use crate::formats::json::json::Json;
+use crate::formats::xml::xml::Xml;
 use crate::models::structured_data::StructuredData;
 
 
@@ -52,7 +53,7 @@ pub fn execute(options:HashMap<String, String>) {
         _ => {}
     }
 
-    println!("source format: {}", source.format);
+    // File => Structure
     let mut formatter = get_formatter(source).expect("No formatter available.");
     let format_result = match (*formatter).parse(StructuredData::Unknown) {
         Ok(data) => data,
@@ -61,9 +62,8 @@ pub fn execute(options:HashMap<String, String>) {
             std::process::exit(1);
         }
     };
-    println!("structured :  {:#?}", format_result);
 
-    println!("exporter format: {}", target.format);
+    // Structure => File
     let mut exporter = get_formatter(target).expect("No exporter available.");
     let export_result = match (*exporter).export(format_result) {
         Ok(data) => data,
@@ -80,6 +80,7 @@ pub fn execute(options:HashMap<String, String>) {
 pub fn get_formatter(file:TextFile) -> Option<Box<dyn Format>> {
     match file.format.as_str() {
         "json" => Some(Box::new(Json::new(file))),
+        "box" => Some(Box::new(Xml::new(file))),
         _ => None,
     }
 }

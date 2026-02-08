@@ -1,37 +1,33 @@
-use std::string::String;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use crate::formats::json::json_error::CONTENT_STARTED;
 use crate::models::text_file::TextFile;
 use crate::utils::file_utils::delimited_iter::DelimitedIter;
 
-static JSON_DELIMITERS: [char; 8] = ['{', '}', '[', ']', '"', '\'', ':', ','];
+static XML_DELIMITERS: [char; 10] = ['<', '/', '>', '?', '"', '!', '-', '\'', '=', ' '];
 
 #[derive(Debug)]
-pub struct Json {
+pub struct Xml {
     pub iter: Option<DelimitedIter>,
     pub expectation: &'static HashSet<char>,
-    pub path: String
+    path: String
 }
 
-#[derive(PartialEq)]
-pub enum Target{
-    Key,
-    Value
+pub enum Target {
+    TagName, TagOptions, Value
 }
 
-impl Json {
-
+impl Xml {
     pub fn new(file:TextFile) -> Self {
-        let mut json_iter:Option<DelimitedIter> = file.iter;
+        let mut xml_iter:Option<DelimitedIter> = file.iter;
         let file_path:String = file.path;
 
-        match &mut json_iter {
-            Some(iter) => { iter.set_delimiters(&JSON_DELIMITERS); }
+        match &mut xml_iter {
+            Some(iter) => { iter.set_delimiters(&XML_DELIMITERS); }
             None => {}
         }
 
-        Json {
-            iter: json_iter,
+        Xml {
+            iter: xml_iter,
             expectation: CONTENT_STARTED.get_or_init(|| {
                 HashSet::from([' ', '\n', '\r', '\t', '{', '['])
             }),
